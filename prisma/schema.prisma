@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN 
+  ENGINEER 
+  LEAD
+} 
+
+enum Severity {
+  P1 
+  P2 
+  P3 
+  P4
+} 
+
+enum IncidentStatus {
+  OPEN
+  ACKNOWLEDGED 
+  MITIGATED 
+  RESOLVED
+}
+
+enum EventType {
+  STATUS_CHANGE 
+  SEVERITY_CHANGE 
+  COMMENT 
+  ASSIGNMENT
+}
+
+model User { 
+  id String @id @default(cuid())
+  name String 
+  username String @unique
+  email String @unique 
+  passwordHash String @map("password_hash")
+  role Role @default(ENGINEER)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdIncidents Incident[] @relation("CreatedBy")
+  assignedIncidents Incident[] @relation("AssignedTo")
+  events IncidentEvent[]
+
+  @@map("users")
+}
+
+model Incident {
+  id String @id @default(cuid())
+  title String 
+  description String @db.Text
+  status IncidentStatus @default(OPEN)
+  severity Severity 
+  creatorId String @map("creator_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  resolvedAt DateTime? @map("resolved_at")
+  creator User @relation("CreatedBy",fields:[creatorId],references:[id])
+  assignees User[] @relation("AssignedTo")
+  events IncidentEvent[]
+
+  @@index([status,severity])
+  @@index([creatorId])
+  @@index([createdAt(sort:Desc)])
+  @@map("incidents")
+}
+
+model IncidentEvent {
+  id String @id @default(cuid())
+  incidentId String @map("incident_id")
+  userId String @map("user_id")
+  type EventType 
+  content String @db.Text
+  metadata Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  incident Incident @relation(fields:[incidentId],references:[id],onDelete: Cascade)
+  user User @relation(fields:[userId],references:[id])
+
+  @@index([incidentId,createdAt(sort:Asc)])
+  @@map("incident_events")
+}
