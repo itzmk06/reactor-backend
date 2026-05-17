@@ -6,11 +6,18 @@ import { AppError } from '../lib/error';
 import { env } from '../lib/env';
 import { redisPub } from '../lib/redis';
 import { hashToken } from '../lib/hash';
+import { Role } from '../generated/prisma/enums';
 
 const BCRYPT_ROUNDS = 12;
 const ACCESS_EXPIRY = '15m';
 const REFRESH_EXPIRY = '7d';
 const REFRESH_TTL_SECONDS = 60 * 60 * 24 * 7;
+
+interface RefreshTokenPayload{
+    sub: string;
+    family: string;
+    type: 'refresh';
+}
 
 export async function registerUser(
   email: string,
@@ -74,7 +81,7 @@ export async function loginUser(identifier: string, password: string) {
   };
 }
 
-export async function generateTokenPair(userId: string, role: string, familyId?: string) {
+export async function generateTokenPair(userId: string, role: Role, familyId?: string) {
   const family = familyId ?? nanoid();
   const accessToken = jwt.sign(
     {
@@ -103,9 +110,9 @@ export async function generateTokenPair(userId: string, role: string, familyId?:
 }
 
 export async function rotateRefreshToken(oldRefreshToken: string) {
-  let payload: any;
+  let payload: RefreshTokenPayload;
   try {
-    payload = jwt.verify(oldRefreshToken, env.JWT_REFRESH_SECRET);
+    payload = jwt.verify(oldRefreshToken, env.JWT_REFRESH_SECRET) as RefreshTokenPayload;
   } catch {
     throw new AppError('Invalid refresh token', 401);
   }
@@ -141,9 +148,9 @@ export async function rotateRefreshToken(oldRefreshToken: string) {
 }
 
 export async function logoutUser(refreshToken: string) {
-  let payload: any;
+  let payload: RefreshTokenPayload;
   try {
-    payload = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET) as any;
+    payload = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET) as  RefreshTokenPayload;
   } catch {
     throw new AppError('Invalid refresh token', 401);
   }
