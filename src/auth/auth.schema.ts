@@ -12,18 +12,25 @@ export const registerSchema = z
       .regex(/[A-Z]/, 'Must contain a uppercase character')
       .regex(/[0-9]/, 'Must contain a digit')
       .regex(/[^a-zA-Z0-9]/, 'Must contain a special character'),
-    fullname: z
+    name: z
       .string()
       .trim()
       .min(3, 'Min 3 chars required')
       .max(100, 'Max 100 chars are allowed'),
+    username: z
+      .string()
+      .trim()
+      .min(3, 'Min 3 chars required')
+      .max(30, 'Max 30 chars are allowed')
+      .regex(/^[a-z0-9._]+$/,'Username can contain only . _  a-z 0-9')
+      .toLowerCase(),
   })
   .strict();
 
 // schema for login
 export const loginSchema = z
   .object({
-    email: z.string().trim().toLowerCase().email('Invalid email format'),
+    identifier:z.string().trim().min(1,"email or username required"),
     password: z.string().min(1, 'password required'),
   })
   .strict();
