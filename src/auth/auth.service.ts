@@ -7,17 +7,12 @@ import { env } from '../lib/env';
 import { redisPub } from '../lib/redis';
 import { hashToken } from '../lib/hash';
 import { Role } from '../generated/prisma/enums';
+import { RefreshTokenPayload } from './auth.types';
 
 const BCRYPT_ROUNDS = 12;
 const ACCESS_EXPIRY = '15m';
 const REFRESH_EXPIRY = '7d';
 const REFRESH_TTL_SECONDS = 60 * 60 * 24 * 7;
-
-interface RefreshTokenPayload{
-    sub: string;
-    family: string;
-    type: 'refresh';
-}
 
 export async function registerUser(
   email: string,
@@ -124,7 +119,7 @@ export async function rotateRefreshToken(oldRefreshToken: string) {
   const storedUserId = await redisPub.hget(`family:${family}`, hashedOldRefreshToken);
   if (!storedUserId) {
     await redisPub.del(`family:${family}`);
-    console.warn('Refresh token reuse detected');
+    console.warn('Possible refresh token reuse detected - Sessions have been invalidated');
     throw new AppError('Invalid refresh token', 401);
   }
   if (storedUserId !== userId) {
@@ -150,7 +145,7 @@ export async function rotateRefreshToken(oldRefreshToken: string) {
 export async function logoutUser(refreshToken: string) {
   let payload: RefreshTokenPayload;
   try {
-    payload = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET) as  RefreshTokenPayload;
+    payload = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET) as RefreshTokenPayload;
   } catch {
     throw new AppError('Invalid refresh token', 401);
   }

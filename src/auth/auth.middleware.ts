@@ -3,13 +3,7 @@ import jwt, { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
 import { AppError } from '../lib/error';
 import { Role } from '../generated/prisma/enums';
 import { env } from '../lib/env';
-
-export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    role: Role;
-  };
-}
+import { AuthRequest } from './auth.types';
 
 export function verifyAccessToken(req: AuthRequest, _res: Response, next: NextFunction) {
   try {
