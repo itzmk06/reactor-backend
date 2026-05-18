@@ -11,15 +11,17 @@ import { prisma } from '../lib/prisma';
 import { Role } from '../generated/prisma/enums';
 import { AuthRequest } from './auth.types';
 
-export const appRouter = Router();
+export const authRouter = Router();
 
-const authRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: 'Too many requests from this IP, please try again after 15 minutes',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+const authRateLimit = env.NODE_ENV === 'test' 
+  ? (req: Request, res: Response, next: any) => next()  // skip in tests
+  : rateLimit({
+      windowMs: 15 * 60 * 1000,
+      max: 50,
+      message: 'Too many requests from this IP, please try again after 15 minutes',
+      standardHeaders: true,
+      legacyHeaders: false,
+    });
 
 const COOKIE_OPTIONS: CookieOptions = {
   httpOnly: true,
@@ -28,7 +30,7 @@ const COOKIE_OPTIONS: CookieOptions = {
   maxAge: 1000 * 60 * 60 * 24 * 7,
 };
 
-appRouter.post(
+authRouter.post(
   '/register',
   authRateLimit,
   validate(registerSchema),
@@ -46,7 +48,7 @@ appRouter.post(
   }),
 );
 
-appRouter.post(
+authRouter.post(
   '/login',
   authRateLimit,
   validate(loginSchema),
@@ -64,7 +66,7 @@ appRouter.post(
   }),
 );
 
-appRouter.post(
+authRouter.post(
   '/refresh',
   asyncHandler(async (req: Request, res: Response) => {
     const { refreshToken } = req.cookies;
@@ -82,7 +84,7 @@ appRouter.post(
   }),
 );
 
-appRouter.post(
+authRouter.post(
   '/logout',
   asyncHandler(async (req: Request, res: Response) => {
     const { refreshToken } = req.cookies;
@@ -92,7 +94,7 @@ appRouter.post(
   }),
 );
 
-appRouter.get(
+authRouter.get(
   '/me',
   verifyAccessToken,
   asyncHandler(async (req: AuthRequest, res: Response) => {

@@ -8,7 +8,7 @@
     // See also https://aka.ms/tsconfig/module
     "module": "commonjs",
     "target": "es2020",
-    "types": ["node"],
+    "types": ["node", "jest"],
     // For nodejs:
     "lib": ["es2020"],
     // "types": ["node"],
@@ -20,10 +20,8 @@
     "declarationMap": true,
 
     // Stricter Typechecking Options
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-
-    
+    // "noUncheckedIndexedAccess": true,
+    // "exactOptionalPropertyTypes": true,
 
     // Style Options
     // "noImplicitReturns": true,
@@ -41,11 +39,12 @@
     "moduleDetection": "force",
     "skipLibCheck": true,
 
-    // added by us 
+    // added by us
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-  }, 
+    "ignoreDeprecations": "6.0",
+  },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

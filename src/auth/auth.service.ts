@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { nanoid } from 'nanoid';
+import { nanoid } from 'nanoid/non-secure';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/error';
 import { env } from '../lib/env';
