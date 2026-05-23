@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import { authRouter } from './auth/auth.router';
+import { incidentRouter } from './incidents/incident.router';
 import { globalErrorHandler } from './lib/error.middleware';
 export const app = express();
 
@@ -37,6 +38,7 @@ app.use(
 
 // 5. Routes
 app.use('/api/v1/auth', authRouter);
+app.use('/api/v1/incidents',incidentRouter)
 
 // 6. Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));

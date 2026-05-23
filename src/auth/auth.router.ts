@@ -13,15 +13,16 @@ import { AuthRequest } from './auth.types';
 
 export const authRouter = Router();
 
-const authRateLimit = env.NODE_ENV === 'test' 
-  ? (req: Request, res: Response, next: any) => next()  // skip in tests
-  : rateLimit({
-      windowMs: 15 * 60 * 1000,
-      max: 50,
-      message: 'Too many requests from this IP, please try again after 15 minutes',
-      standardHeaders: true,
-      legacyHeaders: false,
-    });
+const authRateLimit =
+  env.NODE_ENV === 'test'
+    ? (req: Request, res: Response, next: any) => next() // skip in tests
+    : rateLimit({
+        windowMs: 15 * 60 * 1000,
+        max: 50,
+        message: 'Too many requests from this IP, please try again after 15 minutes',
+        standardHeaders: true,
+        legacyHeaders: false,
+      });
 
 const COOKIE_OPTIONS: CookieOptions = {
   httpOnly: true,
@@ -33,7 +34,7 @@ const COOKIE_OPTIONS: CookieOptions = {
 authRouter.post(
   '/register',
   authRateLimit,
-  validate(registerSchema),
+  validate(registerSchema,'body'),
   asyncHandler(async (req: Request<{}, {}, RegisterType>, res: Response) => {
     const { email, password, name, username } = req.body;
     const { user, accessToken, refreshToken } = await registerUser(email, password, name, username);
@@ -51,7 +52,7 @@ authRouter.post(
 authRouter.post(
   '/login',
   authRateLimit,
-  validate(loginSchema),
+  validate(loginSchema,'body'),
   asyncHandler(async (req: Request<{}, {}, LoginType>, res: Response) => {
     const { identifier, password } = req.body;
     const { user, accessToken, refreshToken } = await loginUser(identifier.toLowerCase(), password);
@@ -81,7 +82,7 @@ authRouter.post(
         accessToken: tokens.accessToken,
       },
     });
-  }),
+  }), 
 );
 
 authRouter.post(
