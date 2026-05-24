@@ -5,9 +5,10 @@ import { AuthRequest } from '../auth/auth.types';
 import { asyncHandler } from '../lib/asyncHandler';
 import { getUserById, listUsers, updateUserRole } from './user.service';
 import { Role } from '../generated/prisma/enums';
-import { verifyRole } from '../auth/auth.middleware';
+import { verifyAccessToken, verifyRole } from '../auth/auth.middleware';
 
 export const userRouter = Router();
+userRouter.use(verifyAccessToken); 
 
 userRouter.get(
   '/',

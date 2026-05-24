@@ -7,6 +7,7 @@ import rateLimit from 'express-rate-limit';
 import { authRouter } from './auth/auth.router';
 import { incidentRouter } from './incidents/incident.router';
 import { globalErrorHandler } from './lib/error.middleware';
+import { userRouter } from './users/user.router';
 export const app = express();
 
 // 1. Security headers
@@ -39,7 +40,7 @@ app.use(
 // 5. Routes
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/incidents',incidentRouter)
-
+app.use('/api/v1/users',userRouter)
 // 6. Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
