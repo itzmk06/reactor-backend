@@ -6,7 +6,7 @@ import { AppError } from '../lib/error';
 import { IncidentStatus, Severity } from '../generated/prisma/enums';
 
 async function publish(room: string, event: string, data: unknown) {
-  await redisPub.publish('incident:updates', JSON.stringify({ event, room, data }));
+  await redisPub.publish('incident:updates', JSON.stringify({ room, event, data }));
 }
 
 export async function listIncidents(filters: {
