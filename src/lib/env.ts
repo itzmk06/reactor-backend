@@ -9,6 +9,9 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(6060),
   JWT_ACCESS_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
+  GMAIL_USER: z.email(),
+  GMAIL_APP_PASSWORD: z.string(),
+  EMAIL_FROM: z.email(),
 });
 
 export const env = envSchema.parse(process.env);
