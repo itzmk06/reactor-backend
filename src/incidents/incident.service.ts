@@ -4,6 +4,11 @@ import { prisma } from '../lib/prisma';
 import { redisPub } from '../lib/redis';
 import { AppError } from '../lib/error';
 import { IncidentStatus, Severity } from '../generated/prisma/enums';
+import {
+  queueIncidentCreatedNotification,
+  queueIncidentAssignedNotification,
+  queueIncidentResolvedNotification,
+} from '../notifications/notification.queue';
 
 async function publish(room: string, event: string, data: unknown) {
   await redisPub.publish('incident:updates', JSON.stringify({ room, event, data }));
@@ -126,7 +131,33 @@ export async function createIncident(
     });
     return inc;
   });
-  await publish(`incident:${incident.id}`, 'incident:created', incident);
+  try {
+    const recipients = await prisma.user.findMany({
+      where: {
+        role: {
+          in: ['LEAD', 'ADMIN'],
+        },
+      },
+      select: {
+        email: true,
+      },
+    });
+    await queueIncidentCreatedNotification({
+      incidentId: incident.id,
+      severity: incident.severity,
+      title: incident.title,
+      creatorName: incident.creator.name,
+      recipientEmails: recipients.map((recipient) => recipient.email),
+      creatorUsername: incident.creator.username,
+    });
+  } catch (err) {
+    console.error('[NOTIFICATION] Failed to queue incident created notification:', err);
+  }
+  try {
+    await publish(`incident:${incident.id}`, 'incident:created', incident);
+  } catch (err) {
+    console.error('[PUBLISH] Failed to publish incident created event:', err);
+  }
   return incident;
 }
 
@@ -140,7 +171,7 @@ export async function updateStatus(id: string, status: IncidentStatus, userId: s
       where: { id },
       data: {
         status: status as IncidentStatus,
-        resolvedAt: status === 'RESOLVED' ? new Date() : null,
+        resolvedAt: status === IncidentStatus.RESOLVED ? new Date() : null,
       },
     });
     await tx.incidentEvent.create({
@@ -154,11 +185,55 @@ export async function updateStatus(id: string, status: IncidentStatus, userId: s
     });
     return inc;
   });
-  await publish(`incident:${updated.id}`, 'incident:status', {
-    incidentId: updated.id,
-    status: updated.status,
-    updatedAt: updated.updatedAt,
-  });
+  if (updated.status === IncidentStatus.RESOLVED) {
+    try {
+      const [incident, resolvedBy] = await Promise.all([
+        prisma.incident.findUnique({
+          where: {
+            id: updated.id,
+          },
+          include: {
+            assignees: {
+              select: {
+                email: true,
+              },
+            },
+          },
+        }),
+        prisma.user.findUnique({
+          where: {
+            id: userId,
+          },
+          select: {
+            name: true,
+            username: true,
+          },
+        }),
+      ]);
+      if (incident) {
+        const recipients = incident.assignees.map((assignee) => assignee.email);
+        await queueIncidentResolvedNotification({
+          incidentId: updated.id,
+          title: updated.title,
+          severity: updated.severity,
+          resolvedByName: resolvedBy?.name || 'Team',
+          resolvedByUsername: resolvedBy?.username || 'Team',
+          recipientEmails: recipients,
+        });
+      }
+    } catch (err) {
+      console.error('[NOTIFICATION] Failed to queue incident resolved notification:', err);
+    }
+  }
+  try {
+    await publish(`incident:${updated.id}`, 'incident:status', {
+      incidentId: updated.id,
+      status: updated.status,
+      updatedAt: updated.updatedAt,
+    });
+  } catch (err) {
+    console.error('[PUBLISH] Failed to publish incident status event:', err);
+  }
   return updated;
 }
 
@@ -183,11 +258,15 @@ export async function updateSeverity(id: string, severity: Severity, userId: str
     });
     return inc;
   });
-  await publish(`incident:${updated.id}`, 'incident:severity', {
-    incidentId: updated.id,
-    severity: updated.severity,
-    updatedAt: updated.updatedAt,
-  });
+  try {
+    await publish(`incident:${updated.id}`, 'incident:severity', {
+      incidentId: updated.id,
+      severity: updated.severity,
+      updatedAt: updated.updatedAt,
+    });
+  } catch (err) {
+    console.error('[PUBLISH] Failed to publish incident severity event:', err);
+  }
   return updated;
 }
 
@@ -217,14 +296,21 @@ export async function addComment(incidentId: string, content: string, userId: st
     });
     return event;
   });
-  await publish(`incident:${incidentId}`, 'incident:comment', comment);
+  try {
+    await publish(`incident:${incidentId}`, 'incident:comment', comment);
+  } catch (err) {
+    console.error('[PUBLISH] Failed to publish incident comment event:', err);
+  }
   return comment;
 }
 
 export async function assignUser(incidentId: string, assigneeUserId: string, userId: string) {
   const [incident, targetUser] = await Promise.all([
     prisma.incident.findUnique({ where: { id: incidentId } }),
-    prisma.user.findUnique({ where: { id: assigneeUserId } }),
+    prisma.user.findUnique({
+      where: { id: assigneeUserId },
+      select: { id: true, name: true, username: true, role: true, email: true },
+    }),
   ]);
   if (!incident) throw new AppError('incident not found', 404);
   if (!targetUser) throw new AppError('assign user not found', 404);
@@ -254,7 +340,34 @@ export async function assignUser(incidentId: string, assigneeUserId: string, use
     });
     return updated;
   });
-  await publish(`incident:${incidentId}`, 'incident:assignment', event);
+  try {
+    const assignedBy = await prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+      select: {
+        name: true,
+        username: true,
+      },
+    });
+    await queueIncidentAssignedNotification({
+      incidentId,
+      title: incident.title,
+      severity: incident.severity,
+      assigneeName: targetUser.name,
+      assigneeUsername: targetUser.username,
+      assigneeEmail: targetUser.email,
+      assignedByName: assignedBy?.name || 'Incident Command Center',
+      assignedByUsername: assignedBy?.username || 'incident.command.center',
+    });
+  } catch (err) {
+    console.error('[NOTIFICATION] Failed to queue incident assigned notification:', err);
+  }
+  try {
+    await publish(`incident:${incidentId}`, 'incident:assignment', event);
+  } catch (err) {
+    console.error('[PUBLISH] Failed to publish incident assignment event:', err);
+  }
   return event;
 }
 
@@ -297,6 +410,10 @@ export async function unassignUser(incidentId: string, assigneeUserId: string, u
     });
     return updated;
   });
-  await publish(`incident:${incidentId}`, 'incident:unassignment', event);
+  try {
+    await publish(`incident:${incidentId}`, 'incident:unassignment', event);
+  } catch (err) {
+    console.error('[PUBLISH] Failed to publish incident unassignment event:', err);
+  }
   return event;
 }
