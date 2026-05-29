@@ -5,7 +5,7 @@ import { AppError } from '../lib/error';
 
 const redisUrl = new URL(env.REDIS_URL);
 
-const redisConnection = {
+export const redisConnection = {
   host: redisUrl.hostname,
   port: parseInt(redisUrl.port || '6379'),
   username: redisUrl.username || undefined,
