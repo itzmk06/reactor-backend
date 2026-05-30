@@ -26,7 +26,7 @@ export async function notificationProcessor(job: Job<NotificationJobData>) {
         title: data.title,
         severity: data.severity,
         description: data.description,
-        creatorName: data.creatorName,
+        creatorUsername: data.creatorUsername,
       });
       await sendMail({
         to: data.recipientEmail,
@@ -45,8 +45,8 @@ export async function notificationProcessor(job: Job<NotificationJobData>) {
         title: data.title,
         description: data.description,
         severity: data.severity,
-        assignedByName: data.assignedByName,
-        assigneeName: data.assigneeName,
+        assignedByUsername: data.assignedByUsername,
+        assigneeUsername: data.assigneeUsername,
       });
       await sendMail({
         to: data.assigneeEmail,
@@ -65,7 +65,7 @@ export async function notificationProcessor(job: Job<NotificationJobData>) {
         title: data.title,
         description: data.description,
         severity: data.severity,
-        resolvedByName: data.resolvedByName,
+        resolvedByUsername: data.resolvedByUsername,
       });
       await sendMail({
         to: data.recipientEmail,

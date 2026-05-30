@@ -82,6 +82,31 @@ export async function getUserById(id: string) {
   return user;
 }
 
+export async function getUserByUsername(username: string) {
+  const user = await prisma.user.findUnique({
+    where: { username },
+    select: {
+      id: true,
+      name: true,
+      username: true,
+      email: true,
+      role: true,
+      createdAt: true,
+      updatedAt: true,
+      _count: {
+        select: {
+          createdIncidents: true,
+          assignedIncidents: true,
+        },
+      },
+    },
+  });
+  if (!user) {
+    throw new AppError('user not found', 404);
+  }
+  return user;
+}
+
 export async function updateUserRole(targetUserId: string, newRole: Role) {
   const updatedUser = await prisma.$transaction(async (tx) => {
     const user = await tx.user.findUnique({

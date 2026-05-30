@@ -1,3 +1,4 @@
+import { UserUncheckedUpdateManyInput } from './../generated/prisma/models/User';
 import z from 'zod';
 import { Role } from '../generated/prisma/enums';
 
@@ -15,4 +16,14 @@ export const listUsersQuerySchema = z.object({
 
 export const userIdParamSchema = z.object({
   id: z.cuid2('Invalid user ID'),
+});
+
+export const usernameParamSchema = z.object({
+  username: z
+    .string()
+    .trim()
+    .min(3)
+    .max(30)
+    .regex(/^[a-z0-9._]+$/, 'Username can contain only . _  a-z 0-9')
+    .toLowerCase(),
 });
