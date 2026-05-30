@@ -146,6 +146,7 @@ export async function createIncident(
       incidentId: incident.id,
       severity: incident.severity,
       title: incident.title,
+      description: incident.description,
       creatorName: incident.creator.name,
       recipientEmails: recipients.map((recipient) => recipient.email),
       creatorUsername: incident.creator.username,
@@ -216,6 +217,7 @@ export async function updateStatus(id: string, status: IncidentStatus, userId: s
           incidentId: updated.id,
           title: updated.title,
           severity: updated.severity,
+          description: updated.description,
           resolvedByName: resolvedBy?.name || 'Team',
           resolvedByUsername: resolvedBy?.username || 'Team',
           recipientEmails: recipients,
@@ -353,6 +355,7 @@ export async function assignUser(incidentId: string, assigneeUserId: string, use
     await queueIncidentAssignedNotification({
       incidentId,
       title: incident.title,
+      description: incident.description,
       severity: incident.severity,
       assigneeName: targetUser.name,
       assigneeUsername: targetUser.username,

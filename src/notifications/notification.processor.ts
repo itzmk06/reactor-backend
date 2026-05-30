@@ -25,6 +25,7 @@ export async function notificationProcessor(job: Job<NotificationJobData>) {
         incidentId: data.incidentId,
         title: data.title,
         severity: data.severity,
+        description: data.description,
         creatorName: data.creatorName,
       });
       await sendMail({
@@ -42,6 +43,7 @@ export async function notificationProcessor(job: Job<NotificationJobData>) {
       const { subject, html } = incidentAssignedTemplate({
         incidentId: data.incidentId,
         title: data.title,
+        description: data.description,
         severity: data.severity,
         assignedByName: data.assignedByName,
         assigneeName: data.assigneeName,
@@ -61,6 +63,7 @@ export async function notificationProcessor(job: Job<NotificationJobData>) {
       const { subject, html } = incidentResolvedTemplate({
         incidentId: data.incidentId,
         title: data.title,
+        description: data.description,
         severity: data.severity,
         resolvedByName: data.resolvedByName,
       });

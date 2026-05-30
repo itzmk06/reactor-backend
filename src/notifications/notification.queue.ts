@@ -31,6 +31,7 @@ export interface IncidentCreatedJobData {
   creatorName: string;
   creatorUsername: string;
   recipientEmail: string;
+  description: string;
 }
 
 export interface IncidentAssignedJobData {
@@ -42,6 +43,8 @@ export interface IncidentAssignedJobData {
   assigneeEmail: string;
   assignedByName: string;
   assignedByUsername: string;
+  description: string;
+
 }
 
 export interface IncidentResolvedJobData {
@@ -51,6 +54,8 @@ export interface IncidentResolvedJobData {
   resolvedByName: string;
   resolvedByUsername: string;
   recipientEmail: string;
+  description: string;
+
 }
 
 export function getSeverityPriority(severity: Severity): number {
@@ -99,6 +104,7 @@ export async function queueIncidentCreatedNotification(data: {
   title: string;
   creatorName: string;
   creatorUsername: string;
+  description: string;
   recipientEmails: string[];
 }) {
   const emails = [...new Set(data.recipientEmails)];
@@ -114,6 +120,7 @@ export async function queueIncidentCreatedNotification(data: {
             severity: data.severity,
             creatorName: data.creatorName,
             creatorUsername: data.creatorUsername,
+            description: data.description,
             recipientEmail: email,
           } satisfies IncidentCreatedJobData,
           {
@@ -155,11 +162,12 @@ export async function queueIncidentResolvedNotification(data: {
   severity: Severity;
   resolvedByName: string;
   resolvedByUsername: string;
+  description: string;
   recipientEmails: string[];
 }) {
   const emails = [...new Set(data.recipientEmails)];
   if (emails.length === 0) return;
-  try { 
+  try {
     await Promise.all(
       emails.map((email) => {
         return notificationQueue.add(
@@ -170,6 +178,7 @@ export async function queueIncidentResolvedNotification(data: {
             severity: data.severity,
             resolvedByName: data.resolvedByName,
             resolvedByUsername: data.resolvedByUsername,
+            description: data.description,
             recipientEmail: email,
           } satisfies IncidentResolvedJobData,
           {

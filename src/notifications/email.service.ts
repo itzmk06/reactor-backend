@@ -32,7 +32,7 @@ export async function verifyMailer() {
 export async function sendMail({ to, subject, html }: SendEmailOptions) {
   try {
     await transporter.sendMail({
-      from: env.EMAIL_FROM ?? env.GMAIL_USER,
+      from: `${env.APP_NAME} <${env.EMAIL_FROM}>`,
       to,
       subject,
       html,
