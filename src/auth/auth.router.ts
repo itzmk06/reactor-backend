@@ -26,7 +26,7 @@ const authRateLimit =
 
 const COOKIE_OPTIONS: CookieOptions = {
   httpOnly: true,
-  sameSite: 'strict' as const,
+  sameSite: env.NODE_ENV === 'production' ? 'strict' : 'lax', 
   secure: env.NODE_ENV === 'production',
   maxAge: 1000 * 60 * 60 * 24 * 7,
 };

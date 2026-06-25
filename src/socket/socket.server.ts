@@ -2,7 +2,7 @@ import { Server } from 'socket.io';
 import { Server as HttpServer } from 'http';
 import jwt from 'jsonwebtoken';
 import { createAdapter } from '@socket.io/redis-adapter';
-import { redisPub, redisSub } from '../lib/redis';
+import { redisPub } from '../lib/redis';
 import { env } from '../lib/env';
 import { Role } from '../generated/prisma/enums';
 
@@ -11,11 +11,13 @@ export let io: Server;
 export function initSocket(httpServer: HttpServer) {
   io = new Server(httpServer, {
     cors: {
-      origin: env.CLIENT_URL || 'http://localhost:5173',
+      origin: env.CLIENT_URL || 'http://localhost:8081',
       credentials: true,
     },
   });
-  io.adapter(createAdapter(redisPub, redisSub));
+  const socketPub = redisPub.duplicate();
+  const socketSub = redisPub.duplicate();
+  io.adapter(createAdapter(socketPub, socketSub));
   io.use(function (socket, next) {
     const token = socket.handshake.auth?.token;
     if (!token) {

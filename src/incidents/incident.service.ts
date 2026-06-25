@@ -163,29 +163,49 @@ export async function createIncident(
 }
 
 export async function updateStatus(id: string, status: IncidentStatus, userId: string) {
-  const updated = await prisma.$transaction(async (tx) => {
-    const existing = await tx.incident.findUnique({
-      where: { id },
-    });
-    if (!existing) throw new AppError('incident not found', 404);
-    const inc = await tx.incident.update({
-      where: { id },
-      data: {
-        status: status as IncidentStatus,
-        resolvedAt: status === IncidentStatus.RESOLVED ? new Date() : null,
+  const [updated, updatedBy] = await Promise.all([
+    prisma.$transaction(async (tx) => {
+      const existing = await tx.incident.findUnique({
+        where: { id },
+      });
+
+      if (!existing) throw new AppError('incident not found', 404);
+
+      const inc = await tx.incident.update({
+        where: { id },
+        data: {
+          status: status as IncidentStatus,
+          resolvedAt: status === IncidentStatus.RESOLVED ? new Date() : null,
+        },
+      });
+
+      await tx.incidentEvent.create({
+        data: {
+          incidentId: inc.id,
+          userId,
+          type: 'STATUS_CHANGE',
+          content: `Status changed from ${existing.status} to ${status}`,
+          metadata: {
+            from: existing.status,
+            to: status,
+          },
+        },
+      });
+
+      return inc;
+    }),
+
+    prisma.user.findUnique({
+      where: {
+        id: userId,
       },
-    });
-    await tx.incidentEvent.create({
-      data: {
-        incidentId: inc.id,
-        userId,
-        type: 'STATUS_CHANGE',
-        content: `Status changed from ${existing.status} to ${status}`,
-        metadata: { from: existing.status, to: status },
+      select: {
+        id: true,
+        name: true,
+        username: true,
       },
-    });
-    return inc;
-  });
+    }),
+  ]);
   if (updated.status === IncidentStatus.RESOLVED) {
     try {
       const [incident, resolvedBy] = await Promise.all([
@@ -230,8 +250,17 @@ export async function updateStatus(id: string, status: IncidentStatus, userId: s
   try {
     await publish(`incident:${updated.id}`, 'incident:status', {
       incidentId: updated.id,
+
       status: updated.status,
+
       updatedAt: updated.updatedAt,
+
+      updatedBy: {
+        id: updatedBy?.id,
+        name: updatedBy?.name,
+        username: updatedBy?.username,
+      },
+      content: `Status changed from ${updated.status} to ${status}`
     });
   } catch (err) {
     console.error('[PUBLISH] Failed to publish incident status event:', err);
@@ -240,31 +269,64 @@ export async function updateStatus(id: string, status: IncidentStatus, userId: s
 }
 
 export async function updateSeverity(id: string, severity: Severity, userId: string) {
-  const updated = await prisma.$transaction(async (tx) => {
-    const existing = await tx.incident.findUnique({
-      where: { id },
-    });
-    if (!existing) throw new AppError('incident not found', 404);
-    const inc = await tx.incident.update({
-      where: { id },
-      data: { severity: severity as Severity },
-    });
-    await tx.incidentEvent.create({
-      data: {
-        incidentId: inc.id,
-        userId,
-        type: 'SEVERITY_CHANGE',
-        content: `Severity changed from ${existing.severity} to ${severity}`,
-        metadata: { from: existing.severity, to: severity },
+  const [updated, updatedBy] = await Promise.all([
+    prisma.$transaction(async (tx) => {
+      const existing = await tx.incident.findUnique({
+        where: { id },
+      });
+
+      if (!existing) throw new AppError('incident not found', 404);
+
+      const inc = await tx.incident.update({
+        where: { id },
+
+        data: {
+          severity: severity as Severity,
+        },
+      });
+
+      await tx.incidentEvent.create({
+        data: {
+          incidentId: inc.id,
+
+          userId,
+
+          type: 'SEVERITY_CHANGE',
+
+          content: `Severity changed from ${existing.severity} to ${severity}`,
+
+          metadata: {
+            from: existing.severity,
+            to: severity,
+          },
+        },
+      });
+
+      return inc;
+    }),
+
+    prisma.user.findUnique({
+      where: {
+        id: userId,
       },
-    });
-    return inc;
-  });
+
+      select: {
+        id: true,
+        name: true,
+        username: true,
+      },
+    }),
+  ]);
   try {
     await publish(`incident:${updated.id}`, 'incident:severity', {
       incidentId: updated.id,
       severity: updated.severity,
       updatedAt: updated.updatedAt,
+      updatedBy: {
+        id: updatedBy?.id,
+        name: updatedBy?.name,
+        username: updatedBy?.username,
+      },
     });
   } catch (err) {
     console.error('[PUBLISH] Failed to publish incident severity event:', err);
@@ -307,19 +369,47 @@ export async function addComment(incidentId: string, content: string, userId: st
 }
 
 export async function assignUser(incidentId: string, assigneeUserId: string, userId: string) {
-  const [incident, targetUser] = await Promise.all([
-    prisma.incident.findUnique({ where: { id: incidentId } }),
+  const [incident, targetUser, assignedBy] = await Promise.all([
+    prisma.incident.findUnique({
+      where: { id: incidentId },
+    }),
+
     prisma.user.findUnique({
       where: { id: assigneeUserId },
-      select: { id: true, name: true, username: true, role: true, email: true },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        role: true,
+        email: true,
+      },
+    }),
+
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+      },
     }),
   ]);
+
   if (!incident) throw new AppError('incident not found', 404);
   if (!targetUser) throw new AppError('assign user not found', 404);
-  const event = await prisma.$transaction(async (tx) => {
+
+  const result = await prisma.$transaction(async (tx) => {
     const updated = await tx.incident.update({
       where: { id: incidentId },
-      data: { assignees: { connect: { id: assigneeUserId } } },
+
+      data: {
+        assignees: {
+          connect: {
+            id: assigneeUserId,
+          },
+        },
+      },
+
       include: {
         assignees: {
           select: {
@@ -331,66 +421,126 @@ export async function assignUser(incidentId: string, assigneeUserId: string, use
         },
       },
     });
-    await tx.incidentEvent.create({
+
+    const dbEvent = await tx.incidentEvent.create({
       data: {
         incidentId,
+
         userId,
+
         type: 'ASSIGNMENT',
+
         content: `Incident assigned to ${targetUser.username}`,
-        metadata: { assigneeId: assigneeUserId, action: 'assigned' },
+
+        metadata: {
+          assigneeId: assigneeUserId,
+          action: 'assigned',
+        },
       },
     });
-    return updated;
+
+    return {
+      updated,
+      dbEvent,
+    };
   });
+
   try {
-    const assignedBy = await prisma.user.findUnique({
-      where: {
-        id: userId,
-      },
-      select: {
-        name: true,
-        username: true,
-      },
-    });
     await queueIncidentAssignedNotification({
       incidentId,
+
       title: incident.title,
+
       description: incident.description,
+
       severity: incident.severity,
+
       assigneeName: targetUser.name,
+
       assigneeUsername: targetUser.username,
+
       assigneeEmail: targetUser.email,
-      assignedByName: assignedBy?.name || 'Incident Command Center',
-      assignedByUsername: assignedBy?.username || 'incident.command.center',
+
+      assignedByName: assignedBy?.name ?? 'Incident Command Center',
+
+      assignedByUsername: assignedBy?.username ?? 'incident.command.center',
     });
   } catch (err) {
     console.error('[NOTIFICATION] Failed to queue incident assigned notification:', err);
   }
+
   try {
-    await publish(`incident:${incidentId}`, 'incident:assignment', event);
+    await publish(`incident:${incidentId}`, 'incident:assignment', {
+      incidentId,
+
+      assignees: result.updated.assignees,
+
+      updatedBy: {
+        id: assignedBy?.id,
+
+        name: assignedBy?.name,
+
+        username: assignedBy?.username,
+      },
+
+      content: result.dbEvent.content,
+
+      metadata: result.dbEvent.metadata,
+
+      createdAt: result.dbEvent.createdAt,
+    });
   } catch (err) {
     console.error('[PUBLISH] Failed to publish incident assignment event:', err);
   }
-  return event;
+
+  return result.updated;
 }
 
 export async function unassignUser(incidentId: string, assigneeUserId: string, userId: string) {
-  const [incident, targetUser] = await Promise.all([
-    prisma.incident.findUnique({ where: { id: incidentId } }),
-    prisma.user.findUnique({ where: { id: assigneeUserId } }),
+  const [incident, targetUser, unassignedBy] = await Promise.all([
+    prisma.incident.findUnique({
+      where: {
+        id: incidentId,
+      },
+    }),
+
+    prisma.user.findUnique({
+      where: {
+        id: assigneeUserId,
+      },
+    }),
+
+    prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+
+      select: {
+        id: true,
+        name: true,
+        username: true,
+      },
+    }),
   ]);
+
   if (!incident) throw new AppError('incident not found', 404);
+
   if (!targetUser) throw new AppError('assign user not found', 404);
-  const event = await prisma.$transaction(async (tx) => {
+
+  const result = await prisma.$transaction(async (tx) => {
     const updated = await tx.incident.update({
       where: {
         id: incidentId,
       },
+
       data: {
         assignees: {
-          disconnect: { id: assigneeUserId },
+          disconnect: {
+            id: assigneeUserId,
+          },
         },
       },
+
       include: {
         assignees: {
           select: {
@@ -402,21 +552,65 @@ export async function unassignUser(incidentId: string, assigneeUserId: string, u
         },
       },
     });
-    await tx.incidentEvent.create({
+
+    const dbEvent = await tx.incidentEvent.create({
       data: {
         incidentId,
+
         userId,
+
         type: 'ASSIGNMENT',
+
         content: `Incident unassigned from ${targetUser.username}`,
-        metadata: { assigneeId: assigneeUserId, action: 'unassigned' },
+
+        metadata: {
+          assigneeId: assigneeUserId,
+
+          action: 'unassigned',
+        },
       },
     });
-    return updated;
+
+    return {
+      updated,
+
+      dbEvent,
+    };
   });
+
   try {
-    await publish(`incident:${incidentId}`, 'incident:unassignment', event);
+    await publish(
+      `incident:${incidentId}`,
+
+      'incident:unassignment',
+
+      {
+        incidentId,
+
+        assignees: result.updated.assignees,
+
+        updatedBy: {
+          id: unassignedBy?.id,
+
+          name: unassignedBy?.name,
+
+          username: unassignedBy?.username,
+        },
+
+        content: result.dbEvent.content,
+
+        metadata: result.dbEvent.metadata,
+
+        createdAt: result.dbEvent.createdAt,
+      },
+    );
   } catch (err) {
-    console.error('[PUBLISH] Failed to publish incident unassignment event:', err);
+    console.error(
+      '[PUBLISH] Failed to publish incident unassignment event:',
+
+      err,
+    );
   }
-  return event;
+
+  return result.updated;
 }
